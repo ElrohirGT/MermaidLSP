@@ -1,7 +1,7 @@
 {
   description = "Mermaid LSP flake";
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-23.11";
+    nixpkgs.url = "nixpkgs/nixos-unstable";
     systems.url = "github:nix-systems/default";
     rust-overlay.url = "github:oxalica/rust-overlay";
     devenv = {
@@ -42,13 +42,39 @@
         cargo = rustVersion;
         rustc = rustVersion;
       };
+      mermaidLspPackage = rustPlatform.buildRustPackage {
+        pname = "mermaid_lsp";
+        version = "0.1.0";
+        src = ./mermaid_lsp;
+        cargoLock.lockFile = ./mermaid_lsp/Cargo.lock;
+      };
     in {
       # For setting up devenv
       devenv-up = self.devShells.${system}.default.config.procfileScript;
 
+      # Mermaid LSP
+      mermaidLSP = mermaidLspPackage;
+
       nvim = nixvim.legacyPackages.${system}.makeNixvim {
+        colorschemes.oxocarbon.enable = true;
         extraConfigLua = ''
-          # TODO: Add extra config of vim here!
+          -- TODO: Add extra config of vim here!
+          local client = vim.lsp.start_client {
+          	name = "mermaid_lsp",
+          	cmd = {"${mermaidLspPackage}/bin/mermaid_lsp"}
+          }
+
+          if not client then
+          	vim.notify "Hey! You did an upsie configuring the client for the LSP!"
+          	return
+          end
+
+          vim.api.nvim_create_autocmd("FileType", {
+          	pattern = "mermaid",
+          	callback = function()
+          		vim.lsp.buf_attach_client(0, client)
+          	end
+          })
         '';
       };
     });

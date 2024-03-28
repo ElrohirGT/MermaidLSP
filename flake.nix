@@ -89,6 +89,8 @@
             packages = with pkgs; [
               # Latest stable release
               (rust-bin.stable.latest.default)
+
+              pre-commit
             ];
           }
         ];

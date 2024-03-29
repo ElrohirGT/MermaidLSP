@@ -57,6 +57,7 @@
 
       nvim = nixvim.legacyPackages.${system}.makeNixvim {
         colorschemes.oxocarbon.enable = true;
+        plugins.lsp.enable = true;
         extraConfigLua = ''
           -- TODO: Add extra config of vim here!
           local client = vim.lsp.start_client {

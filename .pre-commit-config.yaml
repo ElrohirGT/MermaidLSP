@@ -13,7 +13,7 @@ repos:
     rev: v1.1.0
     hooks:
     -   id: fmt
-        args: ['--manifest-path', 'mermaid_lsp/Cargo.toml']
+        args: ['--manifest-path', 'mermaid_lsp/Cargo.toml', '--']
     -   id: cargo-check
         args: ['--manifest-path', 'mermaid_lsp/Cargo.toml']
     -   id: clippy

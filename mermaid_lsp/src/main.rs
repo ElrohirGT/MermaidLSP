@@ -11,4 +11,6 @@ fn main() {
     .unwrap();
 
     info!("Logging setup correctly!");
+
+    let stream = std::io::stdin();
 }

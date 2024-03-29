@@ -9,9 +9,12 @@ repos:
     -   id: check-yaml
     -   id: check-toml
     -   id: check-added-large-files
--   repo: https://github.com/doublify/pre-commit-rust
-    rev: v1.0
+-   repo: https://github.com/FeryET/pre-commit-rust
+    rev: v1.1.0
     hooks:
     -   id: fmt
-    -   id: cargo-check 
+        args: ['--manifest-path', 'mermaid_lsp/Cargo.toml']
+    -   id: cargo-check
+        args: ['--manifest-path', 'mermaid_lsp/Cargo.toml']
     -   id: clippy
+        args: ['--manifest-path', 'mermaid_lsp/Cargo.toml']

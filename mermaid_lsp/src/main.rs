@@ -1,6 +1,7 @@
 use log::error;
 use log::info;
 use mermaid_lsp::LSPMessages;
+use serde::Deserialize;
 use simplelog::*;
 use std::fs::File;
 
@@ -20,11 +21,27 @@ fn main() {
     messages.for_each(|message| match message {
         Ok(message) => {
             info!(
-                "Message received!\nLength: {}\nContent: {:?}",
+                "Message received!\nLength: {}\nContent: {}",
                 message.len(),
-                String::from_utf8_lossy(&message)
+                message
             );
+
+            let body: LspMessageBody = match serde_json::from_str(&message) {
+                Ok(v) => v,
+                Err(e) => {
+                    error!("Message body couldn't be parsed from JSON! {:?}", e);
+                    return;
+                }
+            };
+
+            info!("Message parsed from JSON: {:?}", body);
         }
         Err(e) => error!("An error ocurred while recieving message! {:?}", e),
     })
+}
+
+#[derive(Debug, Deserialize)]
+struct LspMessageBody {
+    id: u32,
+    method: String,
 }

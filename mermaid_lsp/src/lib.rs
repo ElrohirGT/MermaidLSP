@@ -2,7 +2,7 @@ use std::io::{BufRead, BufReader, Read};
 
 use log::{debug, error};
 
-type LSPMessage = Vec<u8>;
+type LSPMessage = String;
 
 pub struct LSPMessages<T: std::io::Read> {
     reader: BufReader<T>,
@@ -20,6 +20,7 @@ pub enum ParseJsonRPCMessageErrors {
     IncorrectHeaderFormat,
     FailedToReadBody(std::io::Error),
     ContentLengthNotANumber(std::num::ParseIntError),
+    FailedToConvertBodyToUTF8(std::string::FromUtf8Error),
 }
 
 impl<T: std::io::Read> Iterator for LSPMessages<T> {
@@ -103,11 +104,22 @@ impl<T: std::io::Read> Iterator for LSPMessages<T> {
             );
             return Some(Err(e));
         }
-        debug!(
-            "[LSPMessages iterator] Body bytes read! {:?}",
-            String::from_utf8_lossy(&body_bytes)
-        );
 
-        Some(Ok(body_bytes))
+        let body = match String::from_utf8(body_bytes)
+            .map_err(ParseJsonRPCMessageErrors::FailedToConvertBodyToUTF8)
+        {
+            Ok(v) => v,
+            Err(e) => {
+                error!(
+                    "[LSPMessages iterator] Failed to parse message body to a string! {:?}",
+                    e
+                );
+
+                return Some(Err(e));
+            }
+        };
+        debug!("[LSPMessages iterator] Body bytes read! {:?}", body);
+
+        Some(Ok(body))
     }
 }

@@ -1,3 +1,6 @@
+pub mod errors;
+pub mod requests;
+
 use std::io::{BufRead, BufReader, Read};
 
 use log::{debug, error};

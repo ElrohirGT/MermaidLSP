@@ -1,5 +1,7 @@
 use log::error;
 use log::info;
+use log::warn;
+use mermaid_lsp::requests::initialize_request;
 use mermaid_lsp::LSPMessages;
 use serde::Deserialize;
 use simplelog::*;
@@ -33,8 +35,14 @@ fn main() {
                     return;
                 }
             };
-
             info!("Message parsed from JSON: {:?}", body);
+
+            match body.method.as_str() {
+                "initialize" => initialize_request(body.params).unwrap(),
+                _ => {
+                    warn!("Unimplemented method received!");
+                }
+            }
         }
         Err(e) => error!("An error ocurred while recieving message! {:?}", e),
     })
@@ -42,6 +50,6 @@ fn main() {
 
 #[derive(Debug, Deserialize)]
 struct LspMessageBody {
-    id: u32,
     method: String,
+    params: serde_json::Value,
 }

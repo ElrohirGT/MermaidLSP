@@ -29,7 +29,7 @@ fn main() {
     let messages = LSPMessages::new(reader);
     let mut initialized = false;
     messages
-        .map(|message| handle_message(&mut initialized, message))
+        .filter_map(|message| handle_message(&mut initialized, message))
         .for_each(|response| {
             let response = match encode_message(response) {
                 Ok(v) => v,
@@ -53,10 +53,12 @@ fn main() {
         });
 }
 
+/// Handles a possible incoming `ClientMessage`. Returns a `ServerResponse` if the server want's to
+/// respond to the incoming `ClientMessage`.
 fn handle_message(
     initialized: &mut bool,
     message: Result<ClientMessage, ParseJsonRPCMessageErrors>,
-) -> ServerResponse {
+) -> Option<ServerResponse> {
     match message {
         Ok(message) => {
             info!("Message received! {:?}", message);
@@ -67,46 +69,52 @@ fn handle_message(
                 {
                     let response = initialize_request(id, params);
                     *initialized = matches!(response, ServerResponse::Result { .. });
-                    response
+                    Some(response)
                 }
 
                 (false, _) => {
                     warn!(
                         "Message recieved and valid but an initialize request has not been sent!"
                     );
-                    ServerResponse::new_error(
+                    let response = ServerResponse::new_error(
                         None,
                         ResponseError::new(
                             ErrorCodes::ServerNotInitialized,
                             "The server need to be initialized first with a `initialize` request!"
                                 .into(),
                         ),
-                    )
+                    );
+
+                    Some(response)
                 }
 
                 (true, ClientMessage::Request { method, .. }) if method == *"initialize" => {
                     warn!("Initialize request received but server is already initialized!");
-                    ServerResponse::new_error(
+                    let response = ServerResponse::new_error(
                         None,
                         ResponseError::new(
                             ErrorCodes::InvalidRequest,
                             "The server is already initialized!".into(),
                         ),
-                    )
+                    );
+
+                    Some(response)
                 }
 
                 (true, ClientMessage::Request { id, method, params }) => {
                     // Handle requests other than initialize...
                     match method {
                         _ => {
-                            warn!("Unimplemented method received!");
-                            ServerResponse::new_error(
+                            warn!("Unimplemented request received!");
+                            let response = ServerResponse::new_error(
                                 None,
                                 ResponseError::new(
                                     ErrorCodes::InvalidRequest,
                                     "This method is not implemented yet!".into(),
                                 ),
-                            )
+                            );
+
+                            Some(response)
                         }
                     }
                 }
@@ -115,14 +123,8 @@ fn handle_message(
                     // Handle notifications...
                     match method {
                         _ => {
-                            warn!("Unimplemented method received!");
-                            ServerResponse::new_error(
-                                None,
-                                ResponseError::new(
-                                    ErrorCodes::InvalidRequest,
-                                    "This method is not implemented yet!".into(),
-                                ),
-                            )
+                            warn!("Unimplemented notification received! Ignoring...");
+                            None
                         }
                     }
                 }
@@ -130,13 +132,15 @@ fn handle_message(
         }
         Err(e) => {
             error!("An error ocurred while recieving message! {:?}", e);
-            ServerResponse::new_error(
+            let response = ServerResponse::new_error(
                 None,
                 ResponseError::new(
                     ErrorCodes::InvalidRequest,
                     "An error occurred while trying to recieve a message!".into(),
                 ),
-            )
+            );
+
+            Some(response)
         }
     }
 }

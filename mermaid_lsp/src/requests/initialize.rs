@@ -54,7 +54,30 @@ pub struct InitializeResult {
 }
 
 #[derive(Debug, Serialize)]
-pub struct ServerCapabilities {}
+pub struct ServerCapabilities {
+    /// Defines how text documents are synced. Is either a detailed structure
+    /// defining each notification or for backwards compatibility the
+    /// TextDocumentSyncKind number. If omitted it defaults to
+    /// `TextDocumentSyncKind.None`.
+    text_document_sync: TextDocumentSyncKind,
+}
+
+/// Defines how the host (editor) should sync document changes to the language
+/// server.
+#[derive(Debug, Serialize)]
+pub enum TextDocumentSyncKind {
+    /// Documents should not be synced at all.
+    None = 0,
+
+    /// Documents are synced by always sending the full content
+    /// of the document.
+    Full = 1,
+
+    /// Documents are synced by sending the full content on open.
+    /// After that only incremental updates to the document are
+    /// sent.
+    Incremental = 2,
+}
 
 pub fn initialize_request(params: serde_json::Value) -> Response {
     let params: InitializeRequestParams = match serde_json::from_value(params) {

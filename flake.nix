@@ -1,13 +1,22 @@
 {
   description = "Mermaid LSP flake";
   inputs = {
+    # Basic inputs
     nixpkgs.url = "nixpkgs/nixos-unstable";
     systems.url = "github:nix-systems/default";
-    rust-overlay.url = "github:oxalica/rust-overlay";
+
+    # DevEnv setup
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     devenv = {
       url = "github:cachix/devenv";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    # Inputs for custom vim installation with MermaidLSP setup
+    rust-overlay.url = "github:oxalica/rust-overlay";
     nixvim = {
       # If you are not running an unstable channel of nixpkgs,
       # select the corresponding branch of nixvim.
@@ -87,12 +96,31 @@
         inherit pkgs inputs;
         modules = [
           {
-            packages = with pkgs; [
-              # Latest stable release
-              (rust-bin.stable.latest.default)
+            languages.rust = {
+              enable = true;
+              channel = "stable";
+            };
 
-              pre-commit
-            ];
+            pre-commit = {
+              hooks = {
+                # Linters
+                clippy.enable = true;
+                actionlint.enable = true;
+                yamllint.enable = true;
+                cargo-check.enable = true;
+                commitizen.enable = true;
+
+                # Formatters
+                taplo.enable = true;
+                alejandra.enable = true;
+              };
+              settings.rust = {
+                cargoManifestPath = "mermaid_lsp/Cargo.toml";
+              };
+              settings.clippy = {
+                allFeatures = true;
+              };
+            };
           }
         ];
       };

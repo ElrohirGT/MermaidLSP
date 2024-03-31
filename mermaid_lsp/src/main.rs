@@ -29,37 +29,49 @@ fn main() {
     let reader = std::io::BufReader::new(stdin);
     let messages = LSPMessages::new(reader);
     let mut initialized = false;
-    messages
-        .filter_map(|message| handle_message(&mut initialized, message))
-        .for_each(|response| {
-            let response = match encode_message(response) {
-                Ok(v) => v,
-                Err(e) => {
-                    error!("The response couldn't be serialized into a string! {:?}", e);
-                    return;
+
+    let responses = messages.map(|message| handle_message(&mut initialized, message));
+    for response in responses {
+        match response {
+            ServerAction::Ignore => {}
+            ServerAction::Exit => break,
+            ServerAction::Respond(response) => {
+                let response = match encode_message(response) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        error!("The response couldn't be serialized into a string! {:?}", e);
+                        return;
+                    }
+                };
+
+                let mut stdout = io::stdout();
+
+                info!("Sending response: {:?}", response);
+                if let Err(e) = stdout.write_all(response.as_bytes()) {
+                    error!("An error occurred while writing to STDOUT {:?}", e);
                 }
-            };
+                if let Err(e) = stdout.flush() {
+                    error!("An error occurred while flushing STDOUT {:?}", e);
+                }
 
-            let mut stdout = io::stdout();
-
-            info!("Sending response: {:?}", response);
-            if let Err(e) = stdout.write_all(response.as_bytes()) {
-                error!("An error occurred while writing to STDOUT {:?}", e);
+                info!("Response sent!")
             }
-            if let Err(e) = stdout.flush() {
-                error!("An error occurred while flushing STDOUT {:?}", e);
-            }
-
-            info!("Response sent!")
-        });
+        }
+    }
 }
 
-/// Handles a possible incoming `ClientMessage`. Returns a `ServerResponse` if the server want's to
-/// respond to the incoming `ClientMessage`.
+/// Enum that represents all actions the server can take when it recieves a `ClientMessage`
+enum ServerAction {
+    Respond(ServerResponse),
+    Ignore,
+    Exit,
+}
+
+/// Handles a possible incoming `ClientMessage`.
 fn handle_message(
     initialized: &mut bool,
     message: Result<ClientMessage, ParseJsonRPCMessageErrors>,
-) -> Option<ServerResponse> {
+) -> ServerAction {
     match message {
         Ok(message) => {
             info!("Message received! {:?}", message);
@@ -70,7 +82,7 @@ fn handle_message(
                 {
                     let response = initialize_request(id, params);
                     *initialized = matches!(response, ServerResponse::Result { .. });
-                    Some(response)
+                    ServerAction::Respond(response)
                 }
 
                 (false, _) => {
@@ -86,7 +98,7 @@ fn handle_message(
                         ),
                     );
 
-                    Some(response)
+                    ServerAction::Respond(response)
                 }
 
                 (true, ClientMessage::Request { method, .. }) if method == *"initialize" => {
@@ -99,13 +111,13 @@ fn handle_message(
                         ),
                     );
 
-                    Some(response)
+                    ServerAction::Respond(response)
                 }
 
                 (true, ClientMessage::Request { id, method, params }) => {
                     // Handle requests other than initialize...
                     match method.as_str() {
-                        "shutdown" => Some(shutdown_request(id)),
+                        "shutdown" => ServerAction::Respond(shutdown_request(id)),
                         _ => {
                             warn!("Unimplemented request received!");
                             let response = ServerResponse::new_error(
@@ -116,17 +128,18 @@ fn handle_message(
                                 ),
                             );
 
-                            Some(response)
+                            ServerAction::Respond(response)
                         }
                     }
                 }
 
                 (true, ClientMessage::Notification { method, params }) => {
                     // Handle notifications...
-                    match method {
+                    match method.as_str() {
+                        "exit" => ServerAction::Exit,
                         _ => {
                             warn!("Unimplemented notification received! Ignoring...");
-                            None
+                            ServerAction::Ignore
                         }
                     }
                 }
@@ -142,7 +155,7 @@ fn handle_message(
                 ),
             );
 
-            Some(response)
+            ServerAction::Respond(response)
         }
     }
 }

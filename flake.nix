@@ -67,6 +67,24 @@
       nvim = nixvim.legacyPackages.${system}.makeNixvim {
         colorschemes.oxocarbon.enable = true;
         plugins.lsp.enable = true;
+        plugins.cmp = {
+          enable = true;
+          autoEnableSources = true;
+          settings = {
+            mapping = {
+              "<C-d>" = "cmp.mapping.scroll_docs(-4)";
+              "<C-f>" = "cmp.mapping.scroll_docs(4)";
+
+              # Manually trigger a completion from nvim-cmp
+              "<C-Space>" = "cmp.mapping.complete()";
+              "<C-e>" = "cmp.mapping.close()";
+              "<C-n>" = "cmp.mapping.select_next_item()";
+              "<C-p>" = "cmp.mapping.select_prev_item()";
+              "<CR>" = "cmp.mapping.confirm({ select = true })";
+            };
+            sources = [{name = "nvim_lsp";}];
+          };
+        };
         extraConfigLua = ''
           -- TODO: Add extra config of vim here!
           local client = vim.lsp.start_client {

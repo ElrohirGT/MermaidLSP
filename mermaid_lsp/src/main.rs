@@ -1,18 +1,18 @@
 use log::error;
 use log::info;
 use log::warn;
-use mermaid_lsp::errors::ErrorCodes;
-use mermaid_lsp::errors::Response;
-use mermaid_lsp::errors::ResponseError;
+use mermaid_lsp::jsonrpc::encode_message;
+use mermaid_lsp::jsonrpc::ClientMessage;
+use mermaid_lsp::jsonrpc::ErrorCodes;
+use mermaid_lsp::jsonrpc::LSPMessages;
+use mermaid_lsp::jsonrpc::ParseJsonRPCMessageErrors;
+use mermaid_lsp::jsonrpc::ResponseError;
+use mermaid_lsp::jsonrpc::ServerResponse;
 use mermaid_lsp::requests::initialize_request;
-use mermaid_lsp::LSPMessages;
-use mermaid_lsp::LspId;
-use mermaid_lsp::ParseJsonRPCMessageErrors;
-use serde::Deserialize;
 use simplelog::*;
 use std::fs::File;
 use std::io;
-use std::io::Write;
+use std::io::prelude::*;
 
 fn main() {
     WriteLogger::init(
@@ -28,58 +28,45 @@ fn main() {
     let reader = std::io::BufReader::new(stdin);
     let messages = LSPMessages::new(reader);
     let mut initialized = false;
-    messages.for_each(|message| {
-        let response = handle_message(&mut initialized, message);
-        let response = match serde_json::to_string(&response) {
-            Ok(v) => v,
-            Err(e) => {
-                error!("The response couldn't be serialized into a string! {:?}", e);
-                return;
+    messages
+        .map(|message| handle_message(&mut initialized, message))
+        .for_each(|response| {
+            let response = match encode_message(response) {
+                Ok(v) => v,
+                Err(e) => {
+                    error!("The response couldn't be serialized into a string! {:?}", e);
+                    return;
+                }
+            };
+
+            let mut stdout = io::stdout();
+
+            info!("Sending response: {:?}", response);
+            if let Err(e) = stdout.write_all(response.as_bytes()) {
+                error!("An error occurred while writing to STDOUT {:?}", e);
             }
-        };
+            if let Err(e) = stdout.flush() {
+                error!("An error occurred while flushing STDOUT {:?}", e);
+            }
 
-        let mut handle = io::stdout().lock();
-
-        info!("Sending response: {}", response);
-        if let Err(e) = writeln!(handle, "{}", response) {
-            error!("An error occurred while writing to STDOUT {:?}", e);
-        }
-
-        info!("Response sent!")
-    })
+            info!("Response sent!")
+        });
 }
 
 fn handle_message(
     initialized: &mut bool,
-    message: Result<String, ParseJsonRPCMessageErrors>,
-) -> Response {
+    message: Result<ClientMessage, ParseJsonRPCMessageErrors>,
+) -> ServerResponse {
     match message {
         Ok(message) => {
-            info!(
-                "Message received! With length: {} - Body: {}",
-                message.len(),
-                message
-            );
+            info!("Message received! {:?}", message);
 
-            let body: LspMessageBody = match serde_json::from_str(&message) {
-                Ok(v) => v,
-                Err(e) => {
-                    error!("Message body couldn't be parsed from JSON! {:?}", e);
-                    return Response::new_error(
-                        None,
-                        ResponseError::new(
-                            ErrorCodes::ParseError,
-                            "The body coudln't be parsed into an object!".into(),
-                        ),
-                    );
-                }
-            };
-            info!("Message parsed from JSON: {:?}", body);
-
-            match (*initialized, body.method.as_str()) {
-                (false, "initialize") => {
-                    let response = initialize_request(body.id, body.params);
-                    *initialized = matches!(response, Response::Result { .. });
+            match (*initialized, message) {
+                (false, ClientMessage::Request { id, method, params })
+                    if method == *"initialize" =>
+                {
+                    let response = initialize_request(id, params);
+                    *initialized = matches!(response, ServerResponse::Result { .. });
                     response
                 }
 
@@ -87,7 +74,7 @@ fn handle_message(
                     warn!(
                         "Message recieved and valid but an initialize request has not been sent!"
                     );
-                    Response::new_error(
+                    ServerResponse::new_error(
                         None,
                         ResponseError::new(
                             ErrorCodes::ServerNotInitialized,
@@ -97,9 +84,9 @@ fn handle_message(
                     )
                 }
 
-                (true, "initialize") => {
+                (true, ClientMessage::Request { method, .. }) if method == *"initialize" => {
                     warn!("Initialize request received but server is already initialized!");
-                    Response::new_error(
+                    ServerResponse::new_error(
                         None,
                         ResponseError::new(
                             ErrorCodes::InvalidRequest,
@@ -108,21 +95,42 @@ fn handle_message(
                     )
                 }
 
-                _ => {
-                    warn!("Unimplemented method received!");
-                    Response::new_error(
-                        None,
-                        ResponseError::new(
-                            ErrorCodes::InvalidRequest,
-                            "This method is not implemented yet!".into(),
-                        ),
-                    )
+                (true, ClientMessage::Request { id, method, params }) => {
+                    // Handle requests other than initialize...
+                    match method {
+                        _ => {
+                            warn!("Unimplemented method received!");
+                            ServerResponse::new_error(
+                                None,
+                                ResponseError::new(
+                                    ErrorCodes::InvalidRequest,
+                                    "This method is not implemented yet!".into(),
+                                ),
+                            )
+                        }
+                    }
+                }
+
+                (true, ClientMessage::Notification { method, params }) => {
+                    // Handle notifications...
+                    match method {
+                        _ => {
+                            warn!("Unimplemented method received!");
+                            ServerResponse::new_error(
+                                None,
+                                ResponseError::new(
+                                    ErrorCodes::InvalidRequest,
+                                    "This method is not implemented yet!".into(),
+                                ),
+                            )
+                        }
+                    }
                 }
             }
         }
         Err(e) => {
             error!("An error ocurred while recieving message! {:?}", e);
-            Response::new_error(
+            ServerResponse::new_error(
                 None,
                 ResponseError::new(
                     ErrorCodes::InvalidRequest,
@@ -131,11 +139,4 @@ fn handle_message(
             )
         }
     }
-}
-
-#[derive(Debug, Deserialize)]
-struct LspMessageBody {
-    id: LspId,
-    method: String,
-    params: serde_json::Value,
 }

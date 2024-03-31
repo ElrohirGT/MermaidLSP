@@ -1,10 +1,7 @@
 use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    errors::{ErrorCodes, Response, ResponseError},
-    LspId,
-};
+use crate::jsonrpc::{ErrorCodes, LspId, ResponseError, ServerResponse};
 
 #[derive(Debug)]
 pub enum InitializeRequestErrors {
@@ -58,14 +55,16 @@ pub struct InitializeResult {
 }
 
 #[derive(Debug, Serialize)]
-pub struct ServerCapabilities {
-    /// Defines how text documents are synced. Is either a detailed structure
-    /// defining each notification or for backwards compatibility the
-    /// TextDocumentSyncKind number. If omitted it defaults to
-    /// `TextDocumentSyncKind.None`.
-    #[serde(rename = "textDocumentSync")]
-    text_document_sync: u8,
-}
+pub struct ServerCapabilities {}
+// #[derive(Debug, Serialize)]
+// pub struct ServerCapabilities {
+//     /// Defines how text documents are synced. Is either a detailed structure
+//     /// defining each notification or for backwards compatibility the
+//     /// TextDocumentSyncKind number. If omitted it defaults to
+//     /// `TextDocumentSyncKind.None`.
+//     #[serde(rename = "textDocumentSync")]
+//     text_document_sync: u8,
+// }
 
 /// Defines how the host (editor) should sync document changes to the language
 /// server.
@@ -84,15 +83,26 @@ pub enum TextDocumentSyncKind {
     Incremental = 2,
 }
 
-pub fn initialize_request(id: LspId, params: serde_json::Value) -> Response {
-    let params: InitializeRequestParams = match serde_json::from_value(params) {
+pub fn initialize_request(id: LspId, params: Option<serde_json::Value>) -> ServerResponse {
+    if params.is_none() {
+        error!("No initialization params supplied!");
+        return ServerResponse::new_error(
+            Some(id),
+            ResponseError::new(
+                ErrorCodes::InvalidParams,
+                "No initialization params supplied!".into(),
+            ),
+        );
+    }
+
+    let params: InitializeRequestParams = match serde_json::from_value(params.unwrap()) {
         Ok(v) => v,
         Err(e) => {
             error!(
                 "An error occurred while trying to parse initialize request params {:?}",
                 e
             );
-            return Response::new_error(
+            return ServerResponse::new_error(
                 Some(id),
                 ResponseError::new(
                     ErrorCodes::InvalidParams,
@@ -112,13 +122,14 @@ pub fn initialize_request(id: LspId, params: serde_json::Value) -> Response {
             name: env!("CARGO_PKG_NAME").to_string(),
             version: Some(env!("CARGO_PKG_VERSION").to_string()),
         },
-        capabilities: ServerCapabilities {
-            text_document_sync: TextDocumentSyncKind::Full as u8,
-        },
+        capabilities: ServerCapabilities {},
+        // capabilities: ServerCapabilities {
+        //     text_document_sync: TextDocumentSyncKind::Full as u8,
+        // },
     };
 
     debug!("Response generated {:?}", server_result);
-    Response::new_result(
+    ServerResponse::new_result(
         Some(id),
         serde_json::to_value(server_result)
             .expect("Server message couldn't be serialized into a value!"),

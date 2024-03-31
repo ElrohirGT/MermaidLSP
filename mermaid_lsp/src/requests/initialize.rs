@@ -1,7 +1,10 @@
 use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 
-use crate::errors::{ErrorCodes, Response, ResponseError};
+use crate::{
+    errors::{ErrorCodes, Response, ResponseError},
+    LspId,
+};
 
 #[derive(Debug)]
 pub enum InitializeRequestErrors {
@@ -31,6 +34,7 @@ pub struct AppInfo {
 
 #[derive(Debug, Deserialize)]
 pub struct ClientCapabilities {
+    /// Workspace specific client capabilities.
     workspace: Option<WorkspaceCapabilities>,
 }
 
@@ -59,7 +63,8 @@ pub struct ServerCapabilities {
     /// defining each notification or for backwards compatibility the
     /// TextDocumentSyncKind number. If omitted it defaults to
     /// `TextDocumentSyncKind.None`.
-    text_document_sync: TextDocumentSyncKind,
+    #[serde(rename = "textDocumentSync")]
+    text_document_sync: u8,
 }
 
 /// Defines how the host (editor) should sync document changes to the language
@@ -79,7 +84,7 @@ pub enum TextDocumentSyncKind {
     Incremental = 2,
 }
 
-pub fn initialize_request(params: serde_json::Value) -> Response {
+pub fn initialize_request(id: LspId, params: serde_json::Value) -> Response {
     let params: InitializeRequestParams = match serde_json::from_value(params) {
         Ok(v) => v,
         Err(e) => {
@@ -87,10 +92,13 @@ pub fn initialize_request(params: serde_json::Value) -> Response {
                 "An error occurred while trying to parse initialize request params {:?}",
                 e
             );
-            return Response::Error(ResponseError::new(
-                ErrorCodes::InvalidParams,
-                "Invalid params supplied to initialize request!".into(),
-            ));
+            return Response::new_error(
+                Some(id),
+                ResponseError::new(
+                    ErrorCodes::InvalidParams,
+                    "Invalid params supplied to initialize request!".into(),
+                ),
+            );
         }
     };
     info!(
@@ -98,5 +106,21 @@ pub fn initialize_request(params: serde_json::Value) -> Response {
         params
     );
 
-    Response::Result(serde_json::Value::Null)
+    debug!("Generating response...");
+    let server_result = InitializeResult {
+        server_info: AppInfo {
+            name: env!("CARGO_PKG_NAME").to_string(),
+            version: Some(env!("CARGO_PKG_VERSION").to_string()),
+        },
+        capabilities: ServerCapabilities {
+            text_document_sync: TextDocumentSyncKind::Full as u8,
+        },
+    };
+
+    debug!("Response generated {:?}", server_result);
+    Response::new_result(
+        Some(id),
+        serde_json::to_value(server_result)
+            .expect("Server message couldn't be serialized into a value!"),
+    )
 }

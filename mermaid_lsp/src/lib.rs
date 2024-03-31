@@ -1,11 +1,20 @@
 pub mod errors;
 pub mod requests;
 
+use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Read};
 
 use log::{debug, error};
 
 type LSPMessage = String;
+
+/// A request/response id, it can be either a string or an integer
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum LspId {
+    String(String),
+    Integer(i32),
+}
 
 pub struct LSPMessages<T: std::io::Read> {
     reader: BufReader<T>,
@@ -65,7 +74,7 @@ impl<T: std::io::Read> Iterator for LSPMessages<T> {
         // Ignoring [ ]<NUMBER>[\r]
         let body_length_bytes = &last_header_part[1..(last_header_part.len() - 1)];
         debug!(
-            "[LSPMessages iterator] Body length as a string!\nOriginal: {:?}\nCut: {:?}",
+            "[LSPMessages iterator] Body length as a string! - Original: {:?} - Cut: {:?}",
             String::from_utf8_lossy(last_header_part),
             String::from_utf8_lossy(body_length_bytes)
         );

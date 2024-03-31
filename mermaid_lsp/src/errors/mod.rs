@@ -3,12 +3,40 @@ pub use error_codes::*;
 
 use serde::Serialize;
 
+use crate::LspId;
+
+pub const JSON_RPC_VERSION: &str = "2.0";
+
 #[derive(Debug, Serialize)]
+#[serde(untagged)]
 pub enum Response {
-    #[serde(rename = "result")]
-    Result(serde_json::Value),
-    #[serde(rename = "error")]
-    Error(ResponseError),
+    Result {
+        jsonrpc: String,
+        id: Option<LspId>,
+        result: serde_json::Value,
+    },
+    Error {
+        jsonrpc: String,
+        id: Option<LspId>,
+        error: ResponseError,
+    },
+}
+
+impl Response {
+    pub fn new_result(id: Option<LspId>, result: serde_json::Value) -> Self {
+        Response::Result {
+            jsonrpc: JSON_RPC_VERSION.into(),
+            id,
+            result,
+        }
+    }
+    pub fn new_error(id: Option<LspId>, error: ResponseError) -> Self {
+        Response::Error {
+            jsonrpc: JSON_RPC_VERSION.into(),
+            id,
+            error,
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]

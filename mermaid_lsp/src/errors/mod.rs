@@ -17,3 +17,20 @@ pub struct ResponseError {
     message: String,
     data: Option<serde_json::Value>,
 }
+
+impl ResponseError {
+    /// Creates a new ResponseError struct
+    pub fn new(code: ErrorCodes, message: String) -> Self {
+        ResponseError {
+            code: code as i32,
+            message,
+            data: None,
+        }
+    }
+
+    /// Adds the specified data to the created struct
+    pub fn with_data(mut self, data: Option<serde_json::Value>) -> Self {
+        self.data = data;
+        self
+    }
+}

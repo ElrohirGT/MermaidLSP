@@ -9,6 +9,7 @@ use mermaid_lsp::jsonrpc::ParseJsonRPCMessageErrors;
 use mermaid_lsp::jsonrpc::ResponseError;
 use mermaid_lsp::jsonrpc::ServerResponse;
 use mermaid_lsp::requests::initialize_request;
+use mermaid_lsp::requests::shutdown_request;
 use simplelog::*;
 use std::fs::File;
 use std::io;
@@ -103,7 +104,8 @@ fn handle_message(
 
                 (true, ClientMessage::Request { id, method, params }) => {
                     // Handle requests other than initialize...
-                    match method {
+                    match method.as_str() {
+                        "shutdown" => Some(shutdown_request(id)),
                         _ => {
                             warn!("Unimplemented request received!");
                             let response = ServerResponse::new_error(

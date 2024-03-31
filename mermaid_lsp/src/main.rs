@@ -1,3 +1,4 @@
+use log::debug;
 use log::error;
 use log::info;
 use log::warn;
@@ -58,6 +59,8 @@ fn main() {
             }
         }
     }
+
+    info!("The server is exiting...");
 }
 
 /// Enum that represents all actions the server can take when it recieves a `ClientMessage`
@@ -117,7 +120,10 @@ fn handle_message(
                 (true, ClientMessage::Request { id, method, params }) => {
                     // Handle requests other than initialize...
                     match method.as_str() {
-                        "shutdown" => ServerAction::Respond(shutdown_request(id)),
+                        "shutdown" => {
+                            info!("Shutting down the server with id: {}", id);
+                            ServerAction::Respond(shutdown_request(id))
+                        }
                         _ => {
                             warn!("Unimplemented request received!");
                             let response = ServerResponse::new_error(

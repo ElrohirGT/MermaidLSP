@@ -2,6 +2,8 @@ mod decoder;
 mod encoder;
 mod error_codes;
 
+use std::fmt::Display;
+
 pub use decoder::*;
 pub use encoder::*;
 pub use error_codes::*;
@@ -16,6 +18,16 @@ pub const JSON_RPC_VERSION: &str = "2.0";
 pub enum LspId {
     String(String),
     Integer(i32),
+}
+
+// Display implementation for LspId, mainly for logs.
+impl Display for LspId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LspId::String(s) => f.write_str(s),
+            LspId::Integer(i) => f.write_fmt(format_args!("{}", i)),
+        }
+    }
 }
 
 /// Represents the message an LSP client sends to this server

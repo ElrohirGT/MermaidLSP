@@ -55,16 +55,14 @@ pub struct InitializeResult {
 }
 
 #[derive(Debug, Serialize)]
-pub struct ServerCapabilities {}
-// #[derive(Debug, Serialize)]
-// pub struct ServerCapabilities {
-//     /// Defines how text documents are synced. Is either a detailed structure
-//     /// defining each notification or for backwards compatibility the
-//     /// TextDocumentSyncKind number. If omitted it defaults to
-//     /// `TextDocumentSyncKind.None`.
-//     #[serde(rename = "textDocumentSync")]
-//     text_document_sync: u8,
-// }
+pub struct ServerCapabilities {
+    /// Defines how text documents are synced. Is either a detailed structure
+    /// defining each notification or for backwards compatibility the
+    /// TextDocumentSyncKind number. If omitted it defaults to
+    /// `TextDocumentSyncKind.None`.
+    #[serde(rename = "textDocumentSync")]
+    text_document_sync: u8,
+}
 
 /// Defines how the host (editor) should sync document changes to the language
 /// server.
@@ -122,10 +120,9 @@ pub fn initialize_request(id: LspId, params: Option<serde_json::Value>) -> Serve
             name: env!("CARGO_PKG_NAME").to_string(),
             version: Some(env!("CARGO_PKG_VERSION").to_string()),
         },
-        capabilities: ServerCapabilities {},
-        // capabilities: ServerCapabilities {
-        //     text_document_sync: TextDocumentSyncKind::Full as u8,
-        // },
+        capabilities: ServerCapabilities {
+            text_document_sync: TextDocumentSyncKind::Full as u8,
+        },
     };
 
     debug!("Response generated {:?}", server_result);

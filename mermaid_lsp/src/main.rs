@@ -9,6 +9,7 @@ use mermaid_lsp::jsonrpc::LSPMessages;
 use mermaid_lsp::jsonrpc::ParseJsonRPCMessageErrors;
 use mermaid_lsp::jsonrpc::ResponseError;
 use mermaid_lsp::jsonrpc::ServerResponse;
+use mermaid_lsp::notifications::text_document::did_open_notification;
 use mermaid_lsp::requests::initialize_request;
 use mermaid_lsp::requests::shutdown_request;
 use mermaid_lsp::ServerState;
@@ -75,7 +76,7 @@ enum ServerAction {
 
 /// Handles a possible incoming `ClientMessage`.
 fn handle_message(
-    mut state: ServerState,
+    state: ServerState,
     message: Result<ClientMessage, ParseJsonRPCMessageErrors>,
 ) -> ServerAction {
     match message {
@@ -87,8 +88,14 @@ fn handle_message(
                     if method == *"initialize" =>
                 {
                     let response = initialize_request(id, params);
-                    state.initialized = matches!(response, ServerResponse::Result { .. });
-                    ServerAction::Respond(state, response)
+                    let initialized = matches!(response, ServerResponse::Result { .. });
+                    ServerAction::Respond(
+                        ServerState {
+                            initialized,
+                            ..state
+                        },
+                        response,
+                    )
                 }
 
                 (false, _) => {
@@ -146,7 +153,10 @@ fn handle_message(
                     // Handle notifications...
                     match method.as_str() {
                         "exit" => ServerAction::Exit,
-                        "textDocument/didOpen" => ServerAction::Ignore(state),
+                        "textDocument/didOpen" => match did_open_notification(state, params) {
+                            Ok(new_state) => ServerAction::Ignore(new_state),
+                            Err((state, e)) => ServerAction::Ignore(state),
+                        },
                         _ => {
                             warn!("Unimplemented notification received! Ignoring...");
                             ServerAction::Ignore(state)

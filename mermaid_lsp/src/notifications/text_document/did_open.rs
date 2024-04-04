@@ -15,6 +15,6 @@ pub enum DidOpenTextDocumentErrors {}
 pub fn did_open_notification(
     state: ServerState,
     params: Option<serde_json::Value>,
-) -> Result<ServerState, DidOpenTextDocumentErrors> {
+) -> Result<ServerState, (ServerState, DidOpenTextDocumentErrors)> {
     Ok(state)
 }

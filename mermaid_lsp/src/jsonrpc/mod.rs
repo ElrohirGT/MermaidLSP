@@ -115,15 +115,16 @@ impl ResponseError {
 #[derive(Debug, Deserialize)]
 pub struct TextDocumentItem {
     /// The text document's URI.
-    uri: String,
+    pub uri: String,
 
     /// The text document's language identifier.
-    language_id: String,
+    #[serde(rename = "languageId")]
+    pub language_id: String,
 
     /// The version number of this document (it will increase after each
     /// change, including undo/redo).
-    version: i32,
+    pub version: i32,
 
     /// The content of the opened text document.
-    text: String,
+    pub text: String,
 }

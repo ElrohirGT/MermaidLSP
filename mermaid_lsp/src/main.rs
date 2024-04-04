@@ -76,7 +76,7 @@ enum ServerAction {
 
 /// Handles a possible incoming `ClientMessage`.
 fn handle_message(
-    state: ServerState,
+    mut state: ServerState,
     message: Result<ClientMessage, ParseJsonRPCMessageErrors>,
 ) -> ServerAction {
     match message {
@@ -153,9 +153,12 @@ fn handle_message(
                     // Handle notifications...
                     match method.as_str() {
                         "exit" => ServerAction::Exit,
-                        "textDocument/didOpen" => match did_open_notification(state, params) {
-                            Ok(new_state) => ServerAction::Ignore(new_state),
-                            Err((state, e)) => ServerAction::Ignore(state),
+                        "textDocument/didOpen" => match did_open_notification(&mut state, params) {
+                            Ok(_) => ServerAction::Ignore(state),
+                            Err(e) => {
+                                error!("An error ocurred while opening file: {:?}", e);
+                                ServerAction::Ignore(state)
+                            }
                         },
                         _ => {
                             warn!("Unimplemented notification received! Ignoring...");

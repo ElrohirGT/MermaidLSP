@@ -11,10 +11,12 @@ use mermaid_lsp::jsonrpc::ResponseError;
 use mermaid_lsp::jsonrpc::ServerResponse;
 use mermaid_lsp::requests::initialize_request;
 use mermaid_lsp::requests::shutdown_request;
+use mermaid_lsp::ServerState;
 use simplelog::*;
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
+use std::ops::ControlFlow;
 
 fn main() {
     WriteLogger::init(
@@ -28,20 +30,19 @@ fn main() {
 
     let stdin = std::io::stdin();
     let reader = std::io::BufReader::new(stdin);
-    let messages = LSPMessages::new(reader);
-    let mut initialized = false;
+    let mut messages = LSPMessages::new(reader);
 
-    let responses = messages.map(|message| handle_message(&mut initialized, message));
-    for response in responses {
-        match response {
-            ServerAction::Ignore => {}
-            ServerAction::Exit => break,
-            ServerAction::Respond(response) => {
+    messages.try_fold(
+        ServerState::default(),
+        |state, message| match handle_message(state, message) {
+            ServerAction::Ignore(new_state) => ControlFlow::Continue(new_state),
+            ServerAction::Exit => ControlFlow::Break(()),
+            ServerAction::Respond(new_state, response) => {
                 let response = match encode_message(response) {
                     Ok(v) => v,
                     Err(e) => {
                         error!("The response couldn't be serialized into a string! {:?}", e);
-                        return;
+                        return ControlFlow::Break(());
                     }
                 };
 
@@ -55,37 +56,39 @@ fn main() {
                     error!("An error occurred while flushing STDOUT {:?}", e);
                 }
 
-                info!("Response sent!")
+                info!("Response sent!");
+
+                ControlFlow::Continue(new_state)
             }
-        }
-    }
+        },
+    );
 
     info!("The server is exiting...");
 }
 
 /// Enum that represents all actions the server can take when it recieves a `ClientMessage`
 enum ServerAction {
-    Respond(ServerResponse),
-    Ignore,
+    Respond(ServerState, ServerResponse),
+    Ignore(ServerState),
     Exit,
 }
 
 /// Handles a possible incoming `ClientMessage`.
 fn handle_message(
-    initialized: &mut bool,
+    mut state: ServerState,
     message: Result<ClientMessage, ParseJsonRPCMessageErrors>,
 ) -> ServerAction {
     match message {
         Ok(message) => {
             info!("Message received! {:?}", message);
 
-            match (*initialized, message) {
+            match (state.initialized, message) {
                 (false, ClientMessage::Request { id, method, params })
                     if method == *"initialize" =>
                 {
                     let response = initialize_request(id, params);
-                    *initialized = matches!(response, ServerResponse::Result { .. });
-                    ServerAction::Respond(response)
+                    state.initialized = matches!(response, ServerResponse::Result { .. });
+                    ServerAction::Respond(state, response)
                 }
 
                 (false, _) => {
@@ -96,12 +99,12 @@ fn handle_message(
                         None,
                         ResponseError::new(
                             ErrorCodes::ServerNotInitialized,
-                            "The server need to be initialized first with a `initialize` request!"
+                            "The server needs to be initialized first with a `initialize` request!"
                                 .into(),
                         ),
                     );
 
-                    ServerAction::Respond(response)
+                    ServerAction::Respond(state, response)
                 }
 
                 (true, ClientMessage::Request { method, .. }) if method == *"initialize" => {
@@ -114,7 +117,7 @@ fn handle_message(
                         ),
                     );
 
-                    ServerAction::Respond(response)
+                    ServerAction::Respond(state, response)
                 }
 
                 (true, ClientMessage::Request { id, method, params }) => {
@@ -122,7 +125,7 @@ fn handle_message(
                     match method.as_str() {
                         "shutdown" => {
                             info!("Shutting down the server with id: {}", id);
-                            ServerAction::Respond(shutdown_request(id))
+                            ServerAction::Respond(state, shutdown_request(id))
                         }
                         _ => {
                             warn!("Unimplemented request received!");
@@ -134,7 +137,7 @@ fn handle_message(
                                 ),
                             );
 
-                            ServerAction::Respond(response)
+                            ServerAction::Respond(state, response)
                         }
                     }
                 }
@@ -143,9 +146,10 @@ fn handle_message(
                     // Handle notifications...
                     match method.as_str() {
                         "exit" => ServerAction::Exit,
+                        "textDocument/didOpen" => ServerAction::Ignore(state),
                         _ => {
                             warn!("Unimplemented notification received! Ignoring...");
-                            ServerAction::Ignore
+                            ServerAction::Ignore(state)
                         }
                     }
                 }
@@ -161,7 +165,7 @@ fn handle_message(
                 ),
             );
 
-            ServerAction::Respond(response)
+            ServerAction::Respond(state, response)
         }
     }
 }

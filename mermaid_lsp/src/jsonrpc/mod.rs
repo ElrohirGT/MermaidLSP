@@ -110,3 +110,20 @@ impl ResponseError {
         self
     }
 }
+
+/// An item to transfer a text document from the client to the server.
+#[derive(Debug, Deserialize)]
+pub struct TextDocumentItem {
+    /// The text document's URI.
+    uri: String,
+
+    /// The text document's language identifier.
+    language_id: String,
+
+    /// The version number of this document (it will increase after each
+    /// change, including undo/redo).
+    version: i32,
+
+    /// The content of the opened text document.
+    text: String,
+}

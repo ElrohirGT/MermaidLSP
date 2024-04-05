@@ -6,6 +6,11 @@ pub enum ParseDiagramBodyErrors {}
 /// Parses an entire diagram content into a struct
 pub fn parse_diagram(content: &str) -> DiagramAST {
     let d_type = parse_diagram_type(content);
+    let data = match d_type {
+        MermaidDiagramTypes::Unknown => DiagramAST::default(),
+        MermaidDiagramTypes::Flowchart => todo!(),
+        _ => todo!(),
+    };
     DiagramAST { d_type }
 }
 

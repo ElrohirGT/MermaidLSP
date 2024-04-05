@@ -1,16 +1,12 @@
 mod diagram_body;
 mod diagram_header;
 
-use std::default;
-
-use serde::Deserialize;
-
 use self::{
     diagram_body::parse_diagram,
     diagram_header::{parse_header, MermaidDiagramHeader},
 };
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub enum MermaidDiagramTypes {
     /// Type that represents when the server couldn't figure out the diagram type
     #[default]
@@ -18,6 +14,7 @@ pub enum MermaidDiagramTypes {
     Flowchart,
     Sequence,
     Class,
+    State,
     EntityRelationship,
     UserJourney,
     Gantt,
@@ -25,16 +22,12 @@ pub enum MermaidDiagramTypes {
     Quadrant,
     Requirement,
     Gitgraph,
-    C4,
     Mindmap,
     Timeline,
     Zenumi,
-    Sankey,
-    XY,
-    Block,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub enum MermaidDiagramDirection {
     #[default]
     TopToBottom,

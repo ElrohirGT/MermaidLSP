@@ -14,7 +14,7 @@ pub enum ParseHeaderErrors {
 }
 
 /// Function that attempts to extract a header from a mermaid content file
-pub fn parse_header(content: &str) -> Result<MermaidDiagramHeader, ParseHeaderErrors> {
+pub fn parse_header(content: &str) -> Result<(String, MermaidDiagramHeader), ParseHeaderErrors> {
     let mut lines = content.trim_start().lines();
 
     let header_top_delim = lines
@@ -38,7 +38,11 @@ pub fn parse_header(content: &str) -> Result<MermaidDiagramHeader, ParseHeaderEr
 
     let title = parse_title(title_line).map_err(ParseHeaderErrors::TitleFormatError)?;
 
-    Ok(MermaidDiagramHeader { title })
+    Ok((
+        lines
+            .fold(String::new(), |acc, e| acc + "\n" + e),
+        MermaidDiagramHeader { title },
+    ))
 }
 
 pub enum ParseTitleErrors {

@@ -48,15 +48,12 @@ pub fn did_open_notification(
         }
         std::collections::hash_map::Entry::Vacant(e) => {
             info!("Generating abstract tree for file...");
-            let ast = generate_mermaid_ast(text);
+            let ast = MermaidAST::from_content(text);
+            info!("AST generated! {:?}", ast);
 
             debug!("Updating state...");
             e.insert(ast);
             Ok(())
         }
     }
-}
-
-fn generate_mermaid_ast(file_contents: String) -> MermaidAST {
-    MermaidAST::default()
 }
